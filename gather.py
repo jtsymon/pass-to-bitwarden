@@ -9,7 +9,9 @@ items = []
 output = {"folders": folders, "items": items}
 
 def parse_file(path):
+    username = None
     password = None
+    notes = ''
     uris = []
     fields = []
 
@@ -22,13 +24,14 @@ def parse_file(path):
             continue
         if ': ' not in line:
             if password:
-                print(f"file {path} has a duplicate password or soemthing (line {i})")
-                continue
+                notes += line + '\n'
             else:
                 password = line
         else:
             k, v = line.split(": ")
-            if k.lower() in ('url', 'link', 'site'):
+            if k.lower() in ('username', 'user', 'login') and not username:
+                username = v
+            elif k.lower() in ('url', 'link', 'site'):
                 uris.append({
                     "match": None,
                     "uri": v,
@@ -39,7 +42,8 @@ def parse_file(path):
                     "value": v,
                     "type": 0,
                 })
-    return password, fields, uris
+
+    return username, password, fields, uris, notes
 
 for dir_name, subdir_list, file_list in os.walk('root'):
     #print(dir_name, subdir_list, file_list)
@@ -51,12 +55,18 @@ for dir_name, subdir_list, file_list in os.walk('root'):
         folder_id = None
 
     for fname in file_list:
-        password, fields, uris = parse_file(os.path.join(dir_name, fname))
+        username, password, fields, uris, notes = parse_file(os.path.join(dir_name, fname))
 
         if folder_id is None:
             item_name = fname
         else:
             item_name = os.path.join(dir_name[5:], fname)
+
+        if len(uris) == 0 and item_name.startswith('WWW/'):
+            uris.append({
+                "match": None,
+                "uri": item_name[4:]
+            })
 
         items.append({
             "id": str(uuid.uuid4()),
@@ -64,10 +74,11 @@ for dir_name, subdir_list, file_list in os.walk('root'):
             "folderId": folder_id,
             "type": 1,
             "name": item_name,
-            "notes": None,
+            "notes": notes,
             "favorite": False,
             "fields": fields,
             "login": {
+                "username": username,
                 "password": password,
                 "totp": None,
                 "uris": uris,
